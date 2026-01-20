@@ -2,17 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>GOO GOO GA GA</title>
+  <title>Foil Santa Panic Mode</title>
   <style>
     html, body {
       margin: 0;
       padding: 0;
-      background: black;
       overflow: hidden;
       touch-action: manipulation;
     }
     canvas {
       display: block;
+      cursor: pointer;
     }
   </style>
 </head>
@@ -31,9 +31,15 @@ function resize() {
 window.addEventListener("resize", resize);
 resize();
 
+// Desktop detection
+const isDesktop = window.matchMedia("(hover: hover)").matches;
+
 // Assets
-const img = new Image();
-img.src = "image.png";
+const santaImg = new Image();
+santaImg.src = "image.png";
+
+const bgImg = new Image();
+bgImg.src = "image2.png";
 
 const sounds = [
   new Audio("part1.wav"),
@@ -41,7 +47,7 @@ const sounds = [
   new Audio("part3.wav")
 ];
 
-let clickCount = 0;
+let soundIndex = 0;
 
 // Santa state
 let revealed = false;
@@ -51,90 +57,104 @@ let targetX = x;
 let targetY = y;
 let rotation = 0;
 let rolling = false;
-let rollingSpeed = 0.5; // rotation speed
-let firstAppearanceRolling = 0; // counter to simulate fast roll on first appearance
+let rollingSpeed = 0.5;
+let firstAppearanceRolling = 0;
 
+// Sound cycle
+function playNextSound() {
+  const s = sounds[soundIndex % sounds.length];
+  s.currentTime = 0;
+  s.play();
+  soundIndex++;
+}
+
+// Move Santa away
+function moveSantaAway(fromX, fromY) {
+  let nx, ny;
+  do {
+    nx = Math.random() * canvas.width;
+    ny = Math.random() * canvas.height;
+  } while (Math.hypot(nx - fromX, ny - fromY) < 200);
+
+  targetX = nx;
+  targetY = ny;
+  rolling = true;
+  rotation = 0;
+
+  playNextSound();
+}
+
+// Click logic
 canvas.addEventListener("click", e => {
   const rect = canvas.getBoundingClientRect();
   const mx = e.clientX - rect.left;
   const my = e.clientY - rect.top;
 
   if (!revealed) {
-    // First click anywhere → Santa appears at click
     x = targetX = mx;
     y = targetY = my;
     revealed = true;
-
-    // Enable rolling animation for first appearance
-    firstAppearanceRolling = 15; // frames of fast spin
-    rolling = false; // no movement yet
-
-    // Play first sound immediately
-    const s = sounds[0];
-    s.currentTime = 0;
-    s.play();
-    clickCount = 1;
+    firstAppearanceRolling = 18;
+    playNextSound();
     return;
   }
 
-  // Check click distance to Santa
-  const dx = mx - x;
-  const dy = my - y;
-  const dist = Math.hypot(dx, dy);
-
+  const dist = Math.hypot(mx - x, my - y);
   if (dist < 150 && !rolling) {
-    // Play cycling sound
-    const s = sounds[clickCount % 3];
-    s.currentTime = 0;
-    s.play();
-    clickCount++;
-
-    // Assign new target position
-    let nx, ny;
-    do {
-      nx = Math.random() * canvas.width;
-      ny = Math.random() * canvas.height;
-    } while (Math.hypot(nx - mx, ny - my) < 200);
-
-    targetX = nx;
-    targetY = ny;
-    rolling = true;
-    rotation = 0;
+    moveSantaAway(mx, my);
   }
 });
 
+// Desktop hover panic
+if (isDesktop) {
+  canvas.addEventListener("mousemove", e => {
+    if (!revealed || rolling) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    const dist = Math.hypot(mx - x, my - y);
+    if (dist < 140) {
+      moveSantaAway(mx, my);
+    }
+  });
+}
+
 // Animation loop
 function animate() {
-  ctx.fillStyle = "black";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Draw background image
+  if (bgImg.complete) {
+    ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+  }
 
   if (revealed) {
 
-    // First appearance fast roll
     if (firstAppearanceRolling > 0) {
-      rotation += rollingSpeed * 5 + Math.random() * 0.5; // very fast spin
+      rotation += rollingSpeed * 5 + Math.random() * 0.6;
       firstAppearanceRolling--;
     }
-    // Santa movement rolling
     else if (rolling) {
       rotation += rollingSpeed * 2 + Math.random() * 0.3;
       x += (targetX - x) * 0.2;
       y += (targetY - y) * 0.2;
+
       if (Math.hypot(targetX - x, targetY - y) < 1) {
         x = targetX;
         y = targetY;
         rotation = 0;
         rolling = false;
       }
-    } else {
-      // tiny idle wobble
+    }
+    else {
       rotation = Math.sin(Date.now() * 0.01) * 0.05;
     }
 
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(rotation);
-    ctx.drawImage(img, -img.width / 2, -img.height / 2);
+    ctx.drawImage(santaImg, -santaImg.width / 2, -santaImg.height / 2);
     ctx.restore();
   }
 
@@ -146,4 +166,3 @@ animate();
 
 </body>
 </html>
-
